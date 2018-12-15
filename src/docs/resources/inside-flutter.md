@@ -4,24 +4,37 @@ title: Inside Flutter
 
 # Overview
 
-This document describes the inner workings of the Flutter toolkit that make
-Flutter’s API possible. Because Flutter widgets are built using aggressive
-composition, user interfaces built with Flutter have a large number of
-widgets.  To support this workload, Flutter uses sublinear algorithms for
-layout and building widgets as well as data structures that make tree
-surgery efficient and that have a number of constant-factor optimizations.
-With some additional details, this design also makes it easy for developers
+This page attempt in summary to describe the inner workings of the Flutter toolkit, and what makes
+Flutter’s API possible. 
+
+```
+More generally, during layout, the _only_ information that flows from
+parent to child are the constraints and the _only_ information that
+flows from child to parent is the geometry. These invariants can reduce
+the amount of work required during layout:
+```
+
+Flutter `widgets` are built using aggressive composition
+- user interfaces built with Flutter have a large number of widgets (nested).  
+- To support this workload, Flutter uses 
+  - sublinear algorithms for layout and building widgets 
+  - with data structures that make tree surgery efficient 
+  - and have a number of constant-factor optimizations.
+  
+With additional details, this design also makes it easy for developers
 to create infinite scrolling lists using callbacks that build exactly those
-widgets that are visible to the user.
+widgets that are visible to the end user.
 
 # Aggressive composability
 
 One of the most distinctive aspects of Flutter is its _aggressive
-composability_. Widgets are built by composing other widgets,
-which are themselves built out of progressively more basic widgets.
-For example, `Padding` is a widget rather than a property of other widgets.
+composability_. 
+- Widgets are built by composing other widgets
+- which are themselves built out of progressively more basic widgets
+
+For example, `Padding` is a `widget` rather than a property of other widgets.
 As a result, user interfaces built with Flutter consist of many,
-many widgets.
+many, many, many `Widgets`;  in a similar fashion to nested html5+css
 
 The widget building recursion bottoms out in `RenderObjectWidgets`,
 which are widgets that create nodes in the underlying _render_ tree.
@@ -41,6 +54,8 @@ With a large number of widgets and render objects, the key to good
 performance is efficient algorithms. Of paramount importance is the
 performance of _layout_, which is the algorithm that determines the
 geometry (for example, the size and position) of the render objects.
+
+
 Some other toolkits use layout algorithms that are O(N²) or worse
 (for example, fixed-point iteration in some constraint domain).
 Flutter aims for linear performance for initial layout, and _sublinear
@@ -48,22 +63,31 @@ layout performance_ in the common case of subsequently updating an
 existing layout. Typically, the amount of time spent in layout should
 scale more slowly than the number of render objects.
 
-Flutter performs one layout per frame, and the layout algorithm works
-in a single pass. _Constraints_ are passed down the tree by parent
-objects calling the layout method on each of their children.
-The children recursively perform their own layout and then return
-_geometry_ up the tree by returning from their layout method. Importantly,
-once a render object has returned from its layout method, that render
-object will not be visited again<sup><a href="#a1">1</a></sup>
-until the layout for the next frame. This approach combines what might
-otherwise be separate measure and layout passes into a single pass and,
+Flutter performs one layout per frame, and the layout 
+algorithm works in a single pass.
+- _Constraints_ are passed down the tree by parent objects 
+   calling the layout method on each of their children.
+- The children recursively perform their own layout and 
+  then return _geometry_ up the tree by returning from their layout method. 
+- Importantly, once a render object has returned from its layout 
+  method, that render  object will not be 
+  visited again<sup><a href="#a1">1</a></sup> >>
+ - >> until the layout for the next frame. 
+ 
+This approach combines what might otherwise 
+be separate measure 
+and layout passes into a single pass 
+and
 as a result, each render object is visited _at most
 twice_<sup><a href="#a2">2</a></sup> during layout: once on the way
 down the tree, and once on the way up the tree.
 
 Flutter has several specializations of this general protocol.
+
+
 The most common specialization is `RenderBox`, which operates in
-two-dimensional, cartesian coordinates. In box layout, the constraints
+two-dimensional, cartesian coordinates. 
+In box layout, the constraints
 are a min and max width and a min and max height. During layout,
 the child determines its geometry by choosing a size within these bounds.
 After the child returns from layout, the parent decides the child's
